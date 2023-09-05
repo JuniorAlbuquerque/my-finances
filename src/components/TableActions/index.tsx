@@ -7,6 +7,7 @@ import {
   TableRow,
   type Selection,
   type SortDescriptor,
+  Spinner,
 } from "@nextui-org/react";
 import {
   useState,
@@ -47,6 +48,7 @@ type TableActionsProps<T> = {
   filterValue?: string;
   statusFilter?: Selection;
   page: number;
+  isLoading?: boolean;
   setPage(page: number): void;
   renderCell: (item: T, columnKey: Key) => ReactNode;
 };
@@ -64,6 +66,7 @@ export const TableActions = <T,>({
   filterDropdownType,
   page = 1,
   headerContent,
+  isLoading,
   setPage,
   renderCell,
 }: TableActionsProps<T>) => {
@@ -194,7 +197,18 @@ export const TableActions = <T,>({
           </TableColumn>
         )}
       </TableHeader>
-      <TableBody emptyContent={"No data found"} items={sortedItems}>
+      <TableBody
+        emptyContent={
+          <div>
+            {isLoading ? (
+              <Spinner />
+            ) : (
+              <span>Nenhuma informação cadastrada</span>
+            )}
+          </div>
+        }
+        items={sortedItems}
+      >
         {(item) => (
           // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
           <TableRow key={(item as any)?.id as number}>

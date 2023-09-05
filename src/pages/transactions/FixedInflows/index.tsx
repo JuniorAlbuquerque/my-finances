@@ -25,31 +25,6 @@ import { montserrat } from "~/pages/_app";
 import { api } from "~/utils/api";
 import { formatCurrency } from "~/utils/formatCurrency";
 
-// type FixedInflowsData = {
-//   id: number;
-//   description: string;
-//   date: string;
-//   category: string;
-//   value: number;
-// };
-
-// const data: FixedInflowsData[] = [
-//   {
-//     id: 1,
-//     description: "Salary",
-//     date: "5",
-//     category: "salary",
-//     value: 6900,
-//   },
-//   {
-//     id: 2,
-//     description: "Freela globo",
-//     date: "3",
-//     category: "salary",
-//     value: 1800,
-//   },
-// ];
-
 const columns = [
   { name: "ID", uid: "id", sortable: true },
   { name: "DESCRIPTION", uid: "description", sortable: true },
@@ -80,9 +55,14 @@ export const FixedInflows: FunctionComponent = () => {
 
   const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
 
-  const { data } = api.inflows.getAllFixedInflows.useQuery(undefined, {
-    placeholderData: [],
-  });
+  const { data, isFetching } = api.inflows.getAllFixedInflows.useQuery(
+    undefined,
+    {
+      placeholderData: [],
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+    }
+  );
 
   const sumExpenses = data?.reduce((acc, current) => acc + current.value, 0);
 
@@ -193,6 +173,7 @@ export const FixedInflows: FunctionComponent = () => {
     <div className="flex flex-col gap-4 pt-4">
       <TableActions
         data={data!}
+        isLoading={isFetching}
         columns={columns}
         page={page}
         setPage={setPage}

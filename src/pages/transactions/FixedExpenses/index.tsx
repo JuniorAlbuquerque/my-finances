@@ -54,10 +54,14 @@ export const FixedExpenses: FunctionComponent = () => {
   const [filterValue, setFilterValue] = useState("");
   const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
 
-  const { data } = api.expense.getAllFixedExpenses.useQuery(undefined, {
-    refetchOnWindowFocus: false,
-    placeholderData: [],
-  });
+  const { data, isFetching } = api.expense.getAllFixedExpenses.useQuery(
+    undefined,
+    {
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+      placeholderData: [],
+    }
+  );
 
   const sumExpenses = data?.reduce((acc, current) => acc + current.value, 0);
 
@@ -168,6 +172,7 @@ export const FixedExpenses: FunctionComponent = () => {
     <div className="flex flex-col gap-4">
       <TableActions
         data={data!}
+        isLoading={isFetching}
         columns={columns}
         page={page}
         setPage={setPage}
