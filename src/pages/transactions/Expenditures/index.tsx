@@ -8,6 +8,7 @@ import {
   Chip,
   type ChipProps,
   type Selection,
+  useDisclosure,
 } from "@nextui-org/react";
 import {
   type Key,
@@ -17,86 +18,33 @@ import {
   useRef,
   useMemo,
   useEffect,
+  type ReactNode,
 } from "react";
-import { BsArrowDown, BsThreeDotsVertical } from "react-icons/bs";
+import { BsThreeDotsVertical } from "react-icons/bs";
 import { IoIosArrowDown } from "react-icons/io";
 import { TableActions } from "~/components/TableActions";
 import { montserrat } from "~/pages/_app";
 import { formatCurrency } from "~/utils/formatCurrency";
 import { parseISO, format } from "date-fns";
-
-type ExpendituresData = {
-  id: number;
-  description: string;
-  date: string;
-  category: string;
-  value: number;
-  fixed?: boolean;
-  card?: string;
-  status: "paid" | "waiting";
-};
-
-const data: ExpendituresData[] = [
-  {
-    id: 1,
-    description: "Apartment rent",
-    date: "10",
-    category: "rent",
-    fixed: true,
-    value: 1500,
-    status: "waiting",
-  },
-  {
-    id: 2,
-    description: "Loan Car",
-    date: "15",
-    category: "other",
-    fixed: true,
-    value: 1055,
-    status: "waiting",
-  },
-  {
-    id: 3,
-    description: "Cellphone",
-    date: "15",
-    category: "other",
-    fixed: true,
-    value: 45,
-    status: "waiting",
-  },
-  {
-    id: 4,
-    description: "Nubank",
-    date: "8",
-    category: "card",
-    value: 2560,
-    card: "nubank",
-    status: "waiting",
-  },
-  {
-    id: 4,
-    description: "Amex",
-    date: "8",
-    category: "card",
-    value: 3543.74,
-    card: "amex",
-    status: "waiting",
-  },
-];
+import { AddExpenses, categoryList } from "~/components/AddExpenditure";
+import { api } from "~/utils/api";
+import { type Expenditure } from "@prisma/client";
+import { formatDate } from "~/utils/formats";
+import { toast } from "react-toastify";
 
 const columns = [
   { name: "ID", uid: "id", sortable: true },
   { name: "DESCRIPTION", uid: "description", sortable: true },
   { name: "VALUE", uid: "value", sortable: true },
-  { name: "PAYMENT DATE", uid: "date", sortable: true },
+  { name: "PAYMENT DATE", uid: "paymentDate", sortable: true },
   { name: "STATUS", uid: "status", sortable: true },
   { name: "CATEGORY", uid: "category", sortable: true },
   { name: "ACTIONS", uid: "actions" },
 ];
 
 const filterOptions = [
-  { name: "Paid", uid: "paid" },
-  { name: "Waiting", uid: "waiting" },
+  { name: "Pago", uid: "PAID" },
+  { name: "Aguardando pagamento", uid: "WAITING" },
 ];
 
 const years = ["2020", "2021", "2022", "2023", "2024"];
@@ -110,8 +58,13 @@ const categoryColorMap = {
 };
 
 const statusColorMap = {
-  paid: "success",
-  waiting: "warning",
+  PAID: "success",
+  WAITING: "warning",
+};
+
+const statusText = {
+  PAID: "Pago",
+  WAITING: "Aguardando",
 };
 
 const months = [...Array(12).keys()].map((_, index) => {
@@ -133,8 +86,23 @@ export const Expenditures: FunctionComponent = () => {
   const [filterValue, setFilterValue] = useState("");
   const [activeMonth, setActiveMonth] = useState(initialMonthIndex);
 
+  const { isOpen, onClose, onOpen, onOpenChange } = useDisclosure();
+
   const monthsItemsRef = useRef<HTMLButtonElement[]>([]);
   const monthWrapperRef = useRef<HTMLDivElement>(null);
+
+  const utils = api.useContext();
+
+  const syncFixedExpenses = api.expense.syncFixedExpense.useMutation();
+
+  const { data, isFetching } = api.expense.getAllExpensesByMonth.useQuery(
+    activeMonth,
+    {
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+      placeholderData: [],
+    }
+  );
 
   const sumExpenses = data?.reduce((acc, current) => acc + current.value, 0);
 
@@ -142,6 +110,17 @@ export const Expenditures: FunctionComponent = () => {
     () => Array.from(yearFilter).join(", ").replaceAll("_", " "),
     [yearFilter]
   );
+
+  const handleSyncFixedExpenses = useCallback(() => {
+    syncFixedExpenses.mutate(activeMonth, {
+      onSuccess() {
+        toast("Despesas fixas sincronizadas com o mês selecionado", {
+          type: "success",
+        });
+        utils.expense.getAllExpensesByMonth.invalidate();
+      },
+    });
+  }, [activeMonth, syncFixedExpenses, utils.expense.getAllExpensesByMonth]);
 
   const onSearchChange = useCallback((value: string) => {
     if (value) {
@@ -159,17 +138,33 @@ export const Expenditures: FunctionComponent = () => {
 
   const TopContent = (
     <div className="flex flex-col gap-6 pb-2">
-      <div className="flex flex-wrap items-end justify-between gap-3 pt-4">
+      <div className="flex flex-wrap gap-4 pt-4">
         <Input
           isClearable
           className="w-full sm:max-w-[44%]"
           placeholder="Search by description..."
-          // startContent={<SearchIcon />}
           value={filterValue}
           onClear={() => onClear()}
           onValueChange={onSearchChange}
         />
-        <div className="ml-auto flex items-end gap-3">
+
+        <div className="ml-auto flex flex-wrap gap-4">
+          <Button
+            color="warning"
+            className="w-full sm:w-fit"
+            isLoading={syncFixedExpenses.isLoading}
+            onClick={handleSyncFixedExpenses}
+          >
+            Sincronizar despesas fixas
+          </Button>
+          <Button color="success" className="w-full sm:w-fit" onClick={onOpen}>
+            Adicionar +
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="ml-auto flex flex-wrap items-end gap-3">
           <Dropdown className={montserrat.className}>
             <DropdownTrigger className="flex">
               <Button
@@ -226,7 +221,6 @@ export const Expenditures: FunctionComponent = () => {
               ))}
             </DropdownMenu>
           </Dropdown>
-          <Button color="success">Add New</Button>
         </div>
       </div>
 
@@ -249,8 +243,8 @@ export const Expenditures: FunctionComponent = () => {
     </div>
   );
 
-  const renderCell = useCallback((item: ExpendituresData, columnKey: Key) => {
-    const cellValue = item[columnKey as keyof ExpendituresData];
+  const renderCell = useCallback((item: Expenditure, columnKey: Key) => {
+    const cellValue = item[columnKey as keyof Expenditure];
 
     switch (columnKey) {
       case "category":
@@ -265,9 +259,11 @@ export const Expenditures: FunctionComponent = () => {
             size="sm"
             variant="flat"
           >
-            {cellValue}
+            {categoryList[cellValue as keyof typeof categoryList] as ReactNode}
           </Chip>
         );
+      case "paymentDate":
+        return formatDate(cellValue as string);
       case "status":
         return (
           <Chip
@@ -276,7 +272,7 @@ export const Expenditures: FunctionComponent = () => {
             size="sm"
             variant="flat"
           >
-            {cellValue}
+            {statusText[cellValue as keyof typeof statusText]}
           </Chip>
         );
       case "value":
@@ -309,7 +305,7 @@ export const Expenditures: FunctionComponent = () => {
           </div>
         );
       default:
-        return cellValue;
+        return cellValue as ReactNode;
     }
   }, []);
 
@@ -335,7 +331,8 @@ export const Expenditures: FunctionComponent = () => {
   return (
     <div className="flex flex-col gap-4">
       <TableActions
-        data={data}
+        data={data!}
+        isLoading={isFetching}
         columns={columns}
         page={page}
         setPage={setPage}
@@ -346,14 +343,14 @@ export const Expenditures: FunctionComponent = () => {
         filterOptions={filterOptions}
         initialVisibleColumns={[
           "category",
-          "date",
+          "paymentDate",
           "description",
           "value",
           "status",
           "actions",
         ]}
         initialSort={{
-          column: "date",
+          column: "paymentDate",
           direction: "ascending",
         }}
         renderCell={renderCell}
@@ -362,8 +359,14 @@ export const Expenditures: FunctionComponent = () => {
 
       <h4 className="self-end p-4 text-xl font-semibold text-danger">
         <span className="text-base">Total:</span>{" "}
-        {formatCurrency(sumExpenses, true)}
+        {formatCurrency(sumExpenses!, true)}
       </h4>
+
+      <AddExpenses
+        isOpen={isOpen}
+        onClose={onClose}
+        onOpenChange={onOpenChange}
+      />
     </div>
   );
 };
