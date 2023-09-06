@@ -38,6 +38,7 @@ export const categoryList = {
   home: "Casa",
   rent: "Aluguel",
   other: "Outros",
+  card: "Cartão",
 };
 
 export const AddFixedExpenses: FunctionComponent<AddFixedExpensesProps> = ({

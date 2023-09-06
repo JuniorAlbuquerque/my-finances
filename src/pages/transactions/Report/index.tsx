@@ -1,4 +1,4 @@
-import { type FunctionComponent } from "react";
+import { useMemo, type FunctionComponent } from "react";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -11,8 +11,9 @@ import {
 } from "chart.js";
 import { Bar, Doughnut } from "react-chartjs-2";
 import { montserrat } from "~/pages/_app";
-import { Card, CardBody, CardHeader, Divider, Spacer } from "@nextui-org/react";
+import { Card, CardBody, CardHeader, Divider } from "@nextui-org/react";
 import { formatCurrency } from "~/utils/formatCurrency";
+import { api } from "~/utils/api";
 
 ChartJS.register(
   CategoryScale,
@@ -45,26 +46,6 @@ const options = {
   },
 };
 
-const labels = ["Mai", "Jun", "Jul", "Ago", "Set"];
-
-const data = {
-  labels,
-  datasets: [
-    {
-      label: "Entradas",
-      data: labels.map(() => Math.floor(Math.random() * (8000 - 3500) + 3500)),
-      backgroundColor: "#19C964",
-      borderRadius: 8,
-    },
-    {
-      label: "Saídas",
-      data: labels.map(() => Math.floor(Math.random() * (5000 - 1500) + 1500)),
-      backgroundColor: "rgba(255, 99, 132, 0.5)",
-      borderRadius: 8,
-    },
-  ],
-};
-
 const pieData = {
   labels: ["Nubank", "Amex", "Home", "Cellphone", "Transport"],
   datasets: [
@@ -94,6 +75,43 @@ const pieData = {
 };
 
 export const Report: FunctionComponent = () => {
+  const { data: reportData } = api.report.getLastMonthInfo.useQuery();
+  const { data: monthReport } = api.report.groupByMonth.useQuery();
+
+  const dataLables = useMemo(() => {
+    const months = {
+      8: "Agosto",
+      9: "Setembro",
+      10: "Outubro",
+      11: "Novembro",
+      12: "Dezembro",
+    };
+
+    return Object.keys(monthReport!).map(
+      (key) => months[parseInt(key) as keyof typeof months]!
+    );
+  }, [monthReport]);
+
+  const chartMonthData = useMemo(() => {
+    return {
+      labels: dataLables,
+      datasets: [
+        {
+          label: "Entradas",
+          data: Object.values(monthReport!)?.map((item) => item.entries),
+          backgroundColor: "#19C964",
+          borderRadius: 8,
+        },
+        {
+          label: "Saídas",
+          data: Object.values(monthReport!)?.map((item) => item.expenses),
+          backgroundColor: "rgba(255, 99, 132, 0.5)",
+          borderRadius: 8,
+        },
+      ],
+    };
+  }, [dataLables, monthReport]);
+
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       <div>
@@ -107,36 +125,40 @@ export const Report: FunctionComponent = () => {
             <div className="mt-4 flex items-center justify-between gap-4 text-medium">
               <p>Entradas</p>
               <div className="h-0.5 w-full bg-success"></div>
-              <p className="font-medium text-success">8500</p>
+              <p className="font-medium text-success">
+                {reportData?.entries ?? 0}
+              </p>
             </div>
 
             <div className="flex items-center justify-between gap-4 text-medium">
               <p className="pr-5">Saídas</p>
               <div className="h-0.5 w-full bg-danger"></div>
-              <p className="font-medium text-danger">5500</p>
+              <p className="font-medium text-danger">{reportData?.expenses}</p>
             </div>
 
             <Divider />
 
             <div className="ml-auto flex gap-4">
               <p className="mt-1">Saldo:</p>
-              <p className="text-2xl font-medium text-danger">5500</p>
+              <p className="text-2xl font-medium text-danger">
+                {reportData?.balance}
+              </p>
             </div>
 
             <div className="mt-7 grid grid-cols-1 place-items-center items-center gap-4 rounded-xl bg-zinc-400/10 p-4 md:grid-cols-3">
               <div>
                 <span className="text-tiny text-default-500">Diário</span>
-                <p>{formatCurrency(85.78, true)}</p>
+                <p>{formatCurrency(reportData?.expensePerDay!, true)}</p>
               </div>
 
               <div>
                 <span className="text-tiny text-default-500">Semanal</span>
-                <p>{formatCurrency(85.78, true)}</p>
+                <p>{formatCurrency(reportData?.expensePerWeek!, true)}</p>
               </div>
 
               <div className="">
                 <span className="text-tiny text-default-500">Mensal</span>
-                <p>{formatCurrency(85.78, true)}</p>
+                <p>{formatCurrency(reportData?.expenses!, true)}</p>
               </div>
             </div>
           </CardBody>
@@ -172,7 +194,7 @@ export const Report: FunctionComponent = () => {
 
       <Card fullWidth className="md:col-span-2">
         <CardBody className="h-full w-full">
-          <Bar options={options} data={data} />
+          <Bar options={options} data={chartMonthData} />
         </CardBody>
       </Card>
     </div>
